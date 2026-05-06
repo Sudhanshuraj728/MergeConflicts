@@ -7,10 +7,12 @@ const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
   try {
-    await initializeDatabase();
-
     const server = app.listen(PORT, () => {
       console.log(`✅ Audio identification backend listening on http://localhost:${PORT}`);
+    });
+
+    initializeDatabase().catch((error) => {
+      console.warn('⚠️  Background database initialization failed:', error.message || error);
     });
 
     // Graceful error handling — prevents nodemon crash-loop on EADDRINUSE
@@ -25,7 +27,7 @@ const startServer = async () => {
       }
     });
   } catch (error) {
-    console.error('Failed to initialize database connection:');
+    console.error('Failed to start backend:');
     console.error(error.message || error);
     process.exit(1);
   }
