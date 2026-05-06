@@ -33,18 +33,25 @@ class AudioMatcher {
   static findMatches(queryFeatures, databaseSongs, topN = 5, threshold = null) {
     const confThreshold = threshold !== null ? threshold : this.CONFIDENCE_THRESHOLD;
 
-    // Calculate similarity score for each song
-    const scores = databaseSongs.map((dbSong) => {
-      const rawScore = this._calculateTotalScore(queryFeatures, dbSong);
-      const confidence = this._scoreToConfidence(rawScore);
+    // Calculate similarity score for each song (defensive per-item handling)
+    const scores = [];
+    for (const dbSong of databaseSongs) {
+      try {
+        const rawScore = this._calculateTotalScore(queryFeatures, dbSong);
+        const confidence = this._scoreToConfidence(rawScore);
 
-      return {
-        song: dbSong,
-        rawScore,
-        confidence,
-        matchingFeatures: this._getMatchingFeaturesBreakdown(queryFeatures, dbSong)
-      };
-    });
+        scores.push({
+          song: dbSong,
+          rawScore,
+          confidence,
+          matchingFeatures: this._getMatchingFeaturesBreakdown(queryFeatures, dbSong)
+        });
+      } catch (err) {
+        console.error('AudioMatcher: error scoring song', dbSong && (dbSong.id || dbSong._id) , err && err.message);
+        // Skip problematic song to avoid crashing the entire matching operation
+        continue;
+      }
+    }
 
     // Filter by threshold
     const filtered = scores.filter((s) => s.confidence >= confThreshold * 100);
@@ -98,8 +105,8 @@ class AudioMatcher {
    * similarity = max(0, 1 - (10.7 / 214)) = 0.95 ✓
    */
   static _compareWaveformStats(queryFeatures, dbSong) {
-    const query = queryFeatures.waveformStats;
-    const db = dbSong.waveformStats;
+    const query = (queryFeatures && queryFeatures.waveformStats) || {};
+    const db = (dbSong && dbSong.waveformStats) || {};
 
     // Define tolerances for each measure (larger = more forgiving)
     const tolerances = {

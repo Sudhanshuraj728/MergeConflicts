@@ -79,9 +79,50 @@ class AudioProcessingPipeline {
       // Optimize query features
       queryFeatures.optimized = this._optimizeFeatures(queryFeatures);
 
-      // Stage 3: Compare against database
+      // Stage 3: Normalize DB song objects (handle legacy/imported 'features' shapes)
       stageTime = Date.now();
-      const matches = AudioMatcher.findMatches(queryFeatures, allSongs, topN, threshold);
+      const normalizedSongs = allSongs.map((s) => {
+        const legacy = s.features || (s.features && s.features.optimized) || null;
+
+        // Normalize waveform stats (legacy keys -> current keys)
+        const legacyWf = legacy && legacy.waveformStats ? legacy.waveformStats : null;
+        const waveformStats = s.waveformStats || (legacyWf && {
+          rmsEnergy: legacyWf.rms ?? legacyWf.rmsEnergy ?? 0,
+          peakAmplitude: legacyWf.peak ?? legacyWf.peakAmplitude ?? 0,
+          zeroCrossingRate: legacyWf.zcr ?? legacyWf.zeroCrossingRate ?? 0,
+          spectralCentroid: legacyWf.centroid ?? legacyWf.spectralCentroid ?? 0,
+          spectralSpread: legacyWf.spread ?? legacyWf.spectralSpread ?? 0,
+          entropy: legacyWf.entropy ?? 0,
+          crestFactor: legacyWf.crest ?? legacyWf.crestFactor ?? 0,
+          flatness: legacyWf.flatness ?? 0
+        }) || {};
+
+        // Normalize spectral fingerprint (legacy may store bands)
+        const legacyFingerprint = legacy && legacy.spectralFingerprint ? legacy.spectralFingerprint : null;
+        const spectralFingerprint = s.spectralFingerprint || (legacyFingerprint && (legacyFingerprint.bands || legacyFingerprint)) || [];
+
+        const anchorPoints = s.anchorPoints || (legacy && legacy.anchorPoints) || [];
+        const audioSignature = s.audioSignature || (legacy && legacy.audioSignature) || {};
+        const metadata = s.metadata || (legacy && legacy.metadata) || {};
+
+        return {
+          ...s,
+          waveformStats,
+          spectralFingerprint,
+          anchorPoints,
+          audioSignature,
+          metadata
+        };
+      });
+
+      let matches = [];
+      try {
+        matches = AudioMatcher.findMatches(queryFeatures, normalizedSongs, topN, threshold);
+      } catch (err) {
+        console.error('AudioMatcher.findMatches failed:', err && err.stack ? err.stack : err);
+        // Fall back to empty matches to avoid crashing the whole request
+        matches = [];
+      }
       const stage3Time = Date.now() - stageTime;
 
       // Stage 4: Rank and format results
@@ -116,8 +157,9 @@ class AudioProcessingPipeline {
         ]
       };
     } catch (error) {
-      console.error('Match processing error:', error);
-      throw new Error(`Matching failed: ${error.message}`);
+      console.error('Match processing error:', error && error.stack ? error.stack : error);
+      // Rethrow original error so callers can see full stack for debugging
+      throw error;
     }
   }
 
