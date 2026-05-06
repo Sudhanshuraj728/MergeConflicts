@@ -1,28 +1,57 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Navbar from "../components/Navbar";
 import UploadBox from "../components/UploadBox";
 import Recorder from "../components/Recorder";
 import WaveformPreview from "../components/WaveformPreview";
-
-const MOCK_RESULTS = [
-  { song: "Shape of You", artist: "Ed Sheeran", confidence: 0.92, album: "÷ (Divide)", year: "2017", genre: "Pop" },
-  { song: "Blinding Lights", artist: "The Weeknd", confidence: 0.88, album: "After Hours", year: "2019", genre: "Synth-pop" },
-  { song: "Levitating", artist: "Dua Lipa", confidence: 0.85, album: "Future Nostalgia", year: "2020", genre: "Pop" },
-  { song: "Stay", artist: "The Kid LAROI & Justin Bieber", confidence: 0.79, album: "Stay", year: "2021", genre: "Pop" },
-  { song: "Heat Waves", artist: "Glass Animals", confidence: 0.91, album: "Dreamland", year: "2020", genre: "Indie Pop" },
-];
+import { matchSong } from "../services/api";
 
 export default function HomePage({ user, onLogout }) {
   const [file, setFile] = useState(null);
   const [inputMode, setInputMode] = useState("upload"); // upload | record
   const [noiseReduction, setNoiseReduction] = useState(false);
   const [duration, setDuration] = useState("10");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
   const navigate = useNavigate();
 
-  const handleIdentify = () => {
-    const result = MOCK_RESULTS[Math.floor(Math.random() * MOCK_RESULTS.length)];
-    navigate("/result", { state: { result, fileName: file?.name } });
+  const handleIdentify = async () => {
+    if (!file) return;
+    setError("");
+    setLoading(true);
+    try {
+      // Call real backend  POST /api/songs/match
+      const data = await matchSong(file, 5);
+
+      // Map backend response to the shape expected by ResultPage
+      const bestMatch = data.bestMatch;
+      const result = bestMatch
+        ? {
+            song: bestMatch.title || "Unknown Song",
+            artist: bestMatch.uploadedBy ? `Uploaded by ${bestMatch.uploadedBy}` : "Unknown Artist",
+            confidence: (data.confidence || 0) / 100,
+            album: bestMatch.description || "—",
+            year: bestMatch.createdAt ? new Date(bestMatch.createdAt).getFullYear().toString() : "—",
+            genre: bestMatch.metadata?.codec || "—",
+            // Pass full API response for the result page
+            _raw: data,
+          }
+        : null;
+
+      navigate("/result", {
+        state: {
+          result,
+          fileName: file?.name,
+          topMatches: data.topMatches || [],
+          matchingFeatures: data.matchingFeatures || {},
+          noMatch: !bestMatch,
+        },
+      });
+    } catch (err) {
+      setError(err.message || "Identification failed. Make sure the backend is running and songs are uploaded.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -34,7 +63,7 @@ export default function HomePage({ user, onLogout }) {
         <div className="animate-fadeUp" style={{ textAlign: "center", marginBottom: 52 }}>
           <div style={{ display: "inline-flex", alignItems: "center", gap: 8, background: "rgba(149,132,192,0.1)", border: "1px solid rgba(149,132,192,0.2)", borderRadius: 99, padding: "6px 16px", marginBottom: 20 }}>
             <div style={{ width: 6, height: 6, borderRadius: "50%", background: "#10b981", boxShadow: "0 0 8px #10b981" }} />
-            <span style={{ fontSize: 12, color: "#9584c0", fontFamily: "Syne,sans-serif", fontWeight: 600 }}>LIVE · 50M+ Tracks in Database</span>
+            <span style={{ fontSize: 12, color: "#9584c0", fontFamily: "Syne,sans-serif", fontWeight: 600 }}>LIVE · Backend-Powered Audio Matching</span>
           </div>
           <h1 style={{ fontFamily: "Syne,sans-serif", fontWeight: 800, fontSize: 42, lineHeight: 1.15, color: "var(--text)", marginBottom: 12 }}>
             Identify Any Song<br />
@@ -52,7 +81,7 @@ export default function HomePage({ user, onLogout }) {
           {/* Mode tabs */}
           <div style={{ display: "flex", gap: 4, background: "var(--surface2)", borderRadius: 10, padding: 4, marginBottom: 24 }}>
             {[["upload", "Upload File", "↑"], ["record", "Record Audio", "⏺"]].map(([mode, label, icon]) => (
-              <button key={mode} onClick={() => { setInputMode(mode); setFile(null); }}
+              <button key={mode} onClick={() => { setInputMode(mode); setFile(null); setError(""); }}
                 style={{ flex: 1, padding: "10px 16px", borderRadius: 8, border: "none", cursor: "pointer", fontFamily: "Syne,sans-serif", fontWeight: 600, fontSize: 13, transition: "all 0.2s",
                   background: inputMode === mode ? "var(--surface)" : "transparent",
                   color: inputMode === mode ? "var(--text)" : "var(--muted)",
@@ -101,15 +130,25 @@ export default function HomePage({ user, onLogout }) {
             </button>
           </div>
 
-          <button className="btn-primary" disabled={!file} onClick={handleIdentify}
-            style={{ marginTop: 20, width: "100%", padding: 16, fontSize: 16 }}>
-            {file ? "⚡ Identify Song" : "Select audio to continue"}
+          {/* Error display */}
+          {error && (
+            <div style={{ marginTop: 16, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)", borderRadius: 10, padding: "12px 16px" }}>
+              <p style={{ color: "#ef4444", fontSize: 13, margin: 0 }}>⚠ {error}</p>
+              <p style={{ color: "var(--muted)", fontSize: 12, margin: "6px 0 0" }}>
+                Make sure the backend server is running (<code>npm run dev</code> in the <code>backend/</code> folder) and that you have uploaded reference songs via POST /api/songs/upload.
+              </p>
+            </div>
+          )}
+
+          <button className="btn-primary" disabled={!file || loading} onClick={handleIdentify}
+            style={{ marginTop: 20, width: "100%", padding: 16, fontSize: 16, opacity: (!file || loading) ? 0.7 : 1 }}>
+            {loading ? "🔍 Identifying…" : file ? "⚡ Identify Song" : "Select audio to continue"}
           </button>
         </div>
 
         {/* Stats row */}
         <div className="animate-fadeUp" style={{ animationDelay: "0.25s", opacity: 0, display: "flex", gap: 16, marginTop: 24 }}>
-          {[["50M+", "Songs indexed"], ["< 3s", "Match speed"], ["98%", "Accuracy rate"]].map(([val, label]) => (
+          {[["File-based", "Local JSON storage"], ["< 3s", "Match speed"], ["98%", "Accuracy rate"]].map(([val, label]) => (
             <div key={label} style={{ flex: 1, background: "var(--surface)", border: "1px solid var(--border)", borderRadius: 12, padding: "16px", textAlign: "center" }}>
               <p style={{ fontFamily: "Syne,sans-serif", fontWeight: 800, fontSize: 22, background: "linear-gradient(135deg,#7c6aad,#9584c0)", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent" }}>{val}</p>
               <p style={{ color: "var(--muted)", fontSize: 12, marginTop: 4 }}>{label}</p>

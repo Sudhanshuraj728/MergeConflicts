@@ -1,20 +1,28 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { login as apiLogin } from "../services/api";
 
 export default function LoginPage({ onLogin }) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleLogin = (e) => {
+  const handleLogin = async (e) => {
     e.preventDefault();
     setError("");
-    const users = JSON.parse(localStorage.getItem("audiomatch_users") || "[]");
-    const user = users.find(u => u.email === email && u.password === password);
-    if (!user) { setError("Invalid email or password."); return; }
-    onLogin(user);
-    navigate("/home");
+    setLoading(true);
+    try {
+      // Call the real backend — JWT token is stored in localStorage inside apiLogin()
+      const session = await apiLogin({ email, password });
+      onLogin(session);
+      navigate("/home");
+    } catch (err) {
+      setError(err.message || "Invalid email or password.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -45,7 +53,9 @@ export default function LoginPage({ onLogin }) {
               <input className="input-field" style={{ marginTop: 6 }} type="password" placeholder="••••••••" value={password} onChange={e => setPassword(e.target.value)} required />
             </div>
             {error && <p style={{ color: "#ef4444", fontSize: 13, background: "rgba(239,68,68,0.08)", borderRadius: 8, padding: "10px 14px", border: "1px solid rgba(239,68,68,0.2)" }}>{error}</p>}
-            <button className="btn-primary" type="submit" style={{ marginTop: 4, width: "100%", padding: "14px" }}>Sign In</button>
+            <button className="btn-primary" type="submit" disabled={loading} style={{ marginTop: 4, width: "100%", padding: "14px", opacity: loading ? 0.7 : 1 }}>
+              {loading ? "Signing in…" : "Sign In"}
+            </button>
           </form>
           <p style={{ textAlign: "center", marginTop: 20, fontSize: 13, color: "var(--muted)" }}>
             Don't have an account?{" "}

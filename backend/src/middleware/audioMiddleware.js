@@ -21,7 +21,7 @@ class AudioMiddleware {
   /**
    * Validate audio file upload
    */
-  static validateAudioFile(req, res, next) {
+  static async validateAudioFile(req, res, next) {
     if (!req.file) {
       return res.status(400).json({
         success: false,
@@ -30,17 +30,22 @@ class AudioMiddleware {
       });
     }
 
-    const validation = AudioProcessingPipeline.validateAudioFile(req.file.path);
+    try {
+      const validation = await AudioProcessingPipeline.validateAudioFile(req.file.path);
 
-    if (!validation.valid) {
-      return res.status(400).json({
-        success: false,
-        error: 'Audio file validation failed',
-        errors: validation.errors
-      });
+      if (!validation.valid) {
+        return res.status(400).json({
+          success: false,
+          error: 'Audio file validation failed',
+          errors: validation.errors
+        });
+      }
+
+      next();
+    } catch (err) {
+      console.error('validateAudioFile error:', err);
+      return res.status(500).json({ success: false, error: 'Audio validation error', details: err.message });
     }
-
-    next();
   }
 
   /**
@@ -91,36 +96,36 @@ class AudioMiddleware {
     const now = Date.now();
 
     // Initialize IP tracking
-    if (!this.requestCounts[clientIP]) {
-      this.requestCounts[clientIP] = [];
+    if (!AudioMiddleware.requestCounts[clientIP]) {
+      AudioMiddleware.requestCounts[clientIP] = [];
     }
 
     // Remove old requests outside the window
-    this.requestCounts[clientIP] = this.requestCounts[clientIP].filter(
-      (timestamp) => now - timestamp < this.RATE_LIMIT_WINDOW
+    AudioMiddleware.requestCounts[clientIP] = AudioMiddleware.requestCounts[clientIP].filter(
+      (timestamp) => now - timestamp < AudioMiddleware.RATE_LIMIT_WINDOW
     );
 
     // Check if limit exceeded
-    if (this.requestCounts[clientIP].length >= this.RATE_LIMIT_REQUESTS) {
+    if (AudioMiddleware.requestCounts[clientIP].length >= AudioMiddleware.RATE_LIMIT_REQUESTS) {
       return res.status(429).json({
         success: false,
         error: 'Rate limit exceeded',
-        details: `Maximum ${this.RATE_LIMIT_REQUESTS} requests per minute`,
+        details: `Maximum ${AudioMiddleware.RATE_LIMIT_REQUESTS} requests per minute`,
         retryAfter: Math.ceil(
-          (this.requestCounts[clientIP][0] + this.RATE_LIMIT_WINDOW - now) / 1000
+          (AudioMiddleware.requestCounts[clientIP][0] + AudioMiddleware.RATE_LIMIT_WINDOW - now) / 1000
         )
       });
     }
 
     // Add current request
-    this.requestCounts[clientIP].push(now);
+    AudioMiddleware.requestCounts[clientIP].push(now);
 
     // Add rate limit headers
     res.set({
-      'X-RateLimit-Limit': this.RATE_LIMIT_REQUESTS,
-      'X-RateLimit-Remaining': this.RATE_LIMIT_REQUESTS - this.requestCounts[clientIP].length,
+      'X-RateLimit-Limit': AudioMiddleware.RATE_LIMIT_REQUESTS,
+      'X-RateLimit-Remaining': AudioMiddleware.RATE_LIMIT_REQUESTS - AudioMiddleware.requestCounts[clientIP].length,
       'X-RateLimit-Reset': new Date(
-        Math.max(...this.requestCounts[clientIP]) + this.RATE_LIMIT_WINDOW
+        Math.max(...AudioMiddleware.requestCounts[clientIP]) + AudioMiddleware.RATE_LIMIT_WINDOW
       ).toISOString()
     });
 
@@ -294,10 +299,10 @@ class AudioMiddleware {
         threshold: '30% default (filters noise)'
       },
       performance: AudioProcessingPipeline.getSystemInfo().performance,
-      rateLimit: {
-          requests: this.RATE_LIMIT_REQUESTS,
+        rateLimit: {
+          requests: AudioMiddleware.RATE_LIMIT_REQUESTS,
           window: '1 minute'
-      }
+        }
     });
   }
 }

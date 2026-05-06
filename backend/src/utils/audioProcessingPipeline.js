@@ -86,6 +86,10 @@ class AudioProcessingPipeline {
 
       // Stage 4: Rank and format results
       stageTime = Date.now();
+      if (!Array.isArray(matches)) {
+        console.error('AudioMatcher.findMatches returned non-array:', matches, 'type:', typeof matches);
+        throw new Error(`AudioMatcher.findMatches returned invalid result type: ${typeof matches}`);
+      }
       const results = this._formatMatchResults(matches, queryFeatures, allSongs.length);
       const stage4Time = Date.now() - stageTime;
 

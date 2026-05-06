@@ -1,20 +1,29 @@
-﻿import { useState } from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { register as apiRegister } from "../services/api";
 
-export default function SignupPage() {
+export default function SignupPage({ onLogin }) {
   const [form, setForm] = useState({ name: "", email: "", password: "" });
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
-  const handleSignup = (e) => {
+  const handleSignup = async (e) => {
     e.preventDefault();
     setError("");
-    const users = JSON.parse(localStorage.getItem("audiomatch_users") || "[]");
-    if (users.find(u => u.email === form.email)) { setError("Email already registered."); return; }
     if (form.password.length < 6) { setError("Password must be at least 6 characters."); return; }
-    users.push(form);
-    localStorage.setItem("audiomatch_users", JSON.stringify(users));
-    navigate("/login");
+    setLoading(true);
+    try {
+      // Calls backend POST /api/auth/register — user is persisted in data/user-db.json
+      // JWT token is saved to localStorage inside apiRegister()
+      const session = await apiRegister(form);
+      if (onLogin) onLogin(session);   // auto-login after register
+      navigate("/home");
+    } catch (err) {
+      setError(err.message || "Registration failed.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -41,7 +50,9 @@ export default function SignupPage() {
               </div>
             ))}
             {error && <p style={{ color: "#ef4444", fontSize: 13, background: "rgba(239,68,68,0.08)", borderRadius: 8, padding: "10px 14px", border: "1px solid rgba(239,68,68,0.2)" }}>{error}</p>}
-            <button className="btn-primary" type="submit" style={{ marginTop: 4, width: "100%", padding: "14px" }}>Create Account</button>
+            <button className="btn-primary" type="submit" disabled={loading} style={{ marginTop: 4, width: "100%", padding: "14px", opacity: loading ? 0.7 : 1 }}>
+              {loading ? "Creating account…" : "Create Account"}
+            </button>
           </form>
           <p style={{ textAlign: "center", marginTop: 20, fontSize: 13, color: "var(--muted)" }}>
             Already have an account?{" "}

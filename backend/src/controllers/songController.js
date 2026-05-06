@@ -1,7 +1,7 @@
 const path = require('path');
 const AudioProcessingPipeline = require('../utils/audioProcessingPipeline');
-const { getAllSongs, getSongById, createSong } = require('../models/songModel');
-const { incrementSongsUploaded } = require('../models/userModel');
+const { getAllSongs, getSongById, createSong, deleteSongById } = require('../models/songMongoModel');
+const { incrementSongsUploaded } = require('../models/userMongoModel');
 
 /**
  * Song Controller
@@ -79,11 +79,17 @@ const uploadSong = async (req, res, next) => {
     const description = req.body.description || '';
     const filePath = req.file.path;
 
-    // Validate audio file
-    const validation = AudioProcessingPipeline.validateAudioFile(filePath);
+    // Validate audio file (async)
+    const validation = await AudioProcessingPipeline.validateAudioFile(filePath);
+    if (!validation || typeof validation.valid === 'undefined') {
+      console.error('Unexpected validation result:', validation);
+      res.status(500);
+      throw new Error('Audio validation returned unexpected result');
+    }
     if (!validation.valid) {
+      console.error('Audio validation errors:', validation.errors);
       res.status(400);
-      throw new Error(`Audio validation failed: ${validation.errors.join(', ')}`);
+      throw new Error(`Audio validation failed: ${Array.isArray(validation.errors) ? validation.errors.join(', ') : String(validation.errors)}`);
     }
 
     // Process upload: extract features
@@ -180,8 +186,8 @@ const matchSong = async (req, res, next) => {
       );
     }
 
-    // Validate query file
-    const validation = AudioProcessingPipeline.validateAudioFile(req.file.path);
+    // Validate query file (async)
+    const validation = await AudioProcessingPipeline.validateAudioFile(req.file.path);
     if (!validation.valid) {
       res.status(400);
       throw new Error(`Query audio validation failed: ${validation.errors.join(', ')}`);
@@ -227,18 +233,13 @@ const matchSong = async (req, res, next) => {
 const deleteSong = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const allSongs = await getAllSongs();
-    const songIndex = allSongs.findIndex((s) => s.id === id);
-
-    if (songIndex === -1) {
+    const deleted = await deleteSongById(id);
+    if (!deleted) {
       res.status(404);
       throw new Error('Song not found');
     }
 
-    // Remove from array and save
-    allSongs.splice(songIndex, 1);
-    const { writeSongDatabase } = require('../utils/fileStore');
-    await writeSongDatabase(allSongs);
+    const allSongs = await getAllSongs();
 
     res.json({
       success: true,

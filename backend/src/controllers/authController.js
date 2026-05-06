@@ -1,6 +1,6 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const { getUserByEmail, createUser, updateUser, getUserById } = require('../models/userModel');
+const { getUserByEmail, createUser, updateUser, getUserById } = require('../models/userMongoModel');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-super-secret-jwt-key-change-in-production';
 const JWT_EXPIRATION = '7d'; // Token expires in 7 days

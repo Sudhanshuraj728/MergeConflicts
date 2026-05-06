@@ -28,6 +28,7 @@ const verifyToken = (req, res, next) => {
     req.user = decoded; // { userId, email }
     next();
   } catch (error) {
+    console.error('JWT verify error:', error);
     if (error.name === 'TokenExpiredError') {
       return res.status(401).json({
         success: false,

@@ -18,6 +18,7 @@ export default function App() {
 
   const login = (userData) => {
     setUser(userData);
+    // Session (including JWT token) is already saved in localStorage by the api service
     localStorage.setItem("audiomatch_session", JSON.stringify(userData));
   };
 
@@ -32,7 +33,7 @@ export default function App() {
         {/* Public routes */}
         <Route path="/" element={user ? <Navigate to="/home" /> : <LandingPage />} />
         <Route path="/login" element={!user ? <LoginPage onLogin={login} /> : <Navigate to="/home" />} />
-        <Route path="/signup" element={!user ? <SignupPage /> : <Navigate to="/home" />} />
+        <Route path="/signup" element={!user ? <SignupPage onLogin={login} /> : <Navigate to="/home" />} />
 
         {/* Protected routes */}
         <Route path="/home" element={user ? <HomePage user={user} onLogout={logout} /> : <Navigate to="/login" />} />

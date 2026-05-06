@@ -259,6 +259,9 @@ class AudioMatcher {
     const querySig = queryFeatures.audioSignature;
     const dbSig = dbSong.audioSignature;
 
+    // Defensive: handle missing signatures
+    if (!querySig || !dbSig) return 0;
+
     // A) Waveform hash comparison (40%)
     const waveformHashScore = this._compareHashes(
       querySig.waveformHash,
@@ -284,7 +287,8 @@ class AudioMatcher {
    * Compare two hash strings character-by-character
    */
   static _compareHashes(queryHash, dbHash) {
-    if (queryHash.length === 0 || dbHash.length === 0) return 0;
+    // Defensive: handle undefined/null hashes
+    if (!queryHash || !dbHash || queryHash.length === 0 || dbHash.length === 0) return 0;
 
     let matches = 0;
     const minLen = Math.min(queryHash.length, dbHash.length);
@@ -308,6 +312,9 @@ class AudioMatcher {
    * - avgBandEnergy: average energy across spectrum
    */
   static _compareEnergyProfiles(queryProfile, dbProfile) {
+    // Defensive: handle missing profiles
+    if (!queryProfile || !dbProfile) return 0;
+    
     const fields = ['overall', 'peak', 'dynamic', 'avgBandEnergy'];
     const tolerance = 0.2; // 20% tolerance
 
