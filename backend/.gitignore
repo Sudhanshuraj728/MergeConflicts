@@ -1,0 +1,12 @@
+node_modules/
+uploads/
+*.mp3
+*.wav
+*.ogg
+*.m4a
+*.flac
+.env
+.env.local
+dist/
+build/
+.DS_Store
