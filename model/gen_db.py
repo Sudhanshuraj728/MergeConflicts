@@ -5,7 +5,7 @@ import whisper
 # Faster model for hackathon
 model = whisper.load_model("tiny")
 
-DATASET_FOLDER = "dataset"
+DATASET_FOLDER = r"D:\Desktop\MeergeCconfliccts\MergeConflicts\data"
 
 database = {}
 
@@ -40,4 +40,4 @@ with open("lyrics.json", "w", encoding="utf-8") as f:
 
     json.dump(database, f, indent=4)
 
-print("\\nLyrics database generated successfully.")
+print("\nLyrics database generated successfully.")
