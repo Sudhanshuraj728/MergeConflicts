@@ -1,4 +1,5 @@
 const path = require('path');
+const fs = require('fs');
 const AudioProcessingPipeline = require('../utils/audioProcessingPipeline');
 const { getAllSongs, getSongById, createSong, deleteSongById } = require('../models/songMongoModel');
 const { incrementSongsUploaded } = require('../models/userMongoModel');
@@ -78,6 +79,25 @@ const uploadSong = async (req, res, next) => {
     const title = req.body.title || req.file.originalname;
     const description = req.body.description || '';
     const filePath = req.file.path;
+
+    // Check for duplicate songs (same title and user)
+    const existingSongs = await getAllSongs();
+    const duplicate = existingSongs.find(song => 
+      song.title === title && song.uploadedBy === userId
+    );
+    
+    if (duplicate) {
+      // Clean up uploaded file
+      try {
+        await fs.promises.unlink(filePath);
+      } catch (err) {
+        console.error('Could not clean up duplicate file:', err);
+      }
+      
+      const error = new Error('A song with this title already exists in your uploads');
+      error.status = 409;
+      throw error;
+    }
 
     // Validate audio file (async)
     const validation = await AudioProcessingPipeline.validateAudioFile(filePath);

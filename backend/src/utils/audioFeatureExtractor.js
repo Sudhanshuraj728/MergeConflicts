@@ -129,21 +129,25 @@ class AudioFeatureExtractor {
       return this._createSyntheticWaveformStats();
     }
 
+    // Limit sample size to prevent stack overflow (max 10 seconds at 8kHz = 80k samples)
+    const maxSamples = 80000;
+    const processedSamples = samples.length > maxSamples ? samples.slice(0, maxSamples) : samples;
+
     // RMS Energy
-    const sumSquares = Array.from(samples).reduce((sum, s) => sum + s * s, 0);
-    const rmsEnergy = Math.sqrt(sumSquares / samples.length);
+    const sumSquares = Array.from(processedSamples).reduce((sum, s) => sum + s * s, 0);
+    const rmsEnergy = Math.sqrt(sumSquares / processedSamples.length);
 
     // Peak Amplitude
-    const peakAmplitude = Math.max(...Array.from(samples).map(Math.abs));
+    const peakAmplitude = Math.max(...Array.from(processedSamples).map(Math.abs));
 
     // Zero-Crossing Rate (frequency indicator)
     let zeroCrossings = 0;
-    for (let i = 1; i < samples.length; i++) {
-      if ((samples[i] >= 0 && samples[i - 1] < 0) || (samples[i] < 0 && samples[i - 1] >= 0)) {
+    for (let i = 1; i < processedSamples.length && i < maxSamples; i++) {
+      if ((processedSamples[i] >= 0 && processedSamples[i - 1] < 0) || (processedSamples[i] < 0 && processedSamples[i - 1] >= 0)) {
         zeroCrossings += 1;
       }
     }
-    const zcr = zeroCrossings / (samples.length - 1);
+    const zcr = zeroCrossings / (processedSamples.length - 1);
 
     // Spectral Centroid & Spread (using FFT)
     const FFT = require('fft-js').fft;
@@ -191,12 +195,12 @@ class AudioFeatureExtractor {
 
     // Flatness (activity level)
     let nonZeroCount = 0;
-    for (let i = 0; i < samples.length; i++) {
-      if (Math.abs(samples[i]) > 0.01) {
+    for (let i = 0; i < processedSamples.length && i < maxSamples; i++) {
+      if (Math.abs(processedSamples[i]) > 0.01) {
         nonZeroCount += 1;
       }
     }
-    const flatness = nonZeroCount / samples.length;
+    const flatness = nonZeroCount / processedSamples.length;
 
     return {
       rmsEnergy: Math.min(1, rmsEnergy),
