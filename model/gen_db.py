@@ -1,11 +1,10 @@
 import os
 import json
 import whisper
+from config import DATASET_FOLDER, WHISPER_MODEL_SIZE
 
 # Faster model for hackathon
-model = whisper.load_model("tiny")
-
-DATASET_FOLDER = r"D:\Desktop\MeergeCconfliccts\MergeConflicts\data"
+model = whisper.load_model(WHISPER_MODEL_SIZE)
 
 database = {}
 
@@ -36,8 +35,11 @@ for file in os.listdir(DATASET_FOLDER):
             print(f"Error processing {file}: {e}")
 
 # Save generated subtitles database
-with open("lyrics.json", "w", encoding="utf-8") as f:
+from config import LYRICS_DB_PATH
+
+with open(LYRICS_DB_PATH, "w", encoding="utf-8") as f:
 
     json.dump(database, f, indent=4)
 
-print("\nLyrics database generated successfully.")
+print(f"\nLyrics database generated successfully at: {LYRICS_DB_PATH}")
+print(f"Total songs processed: {len(database)}")
