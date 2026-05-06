@@ -16,7 +16,9 @@ MATCH_THRESHOLD = int(os.getenv("MATCH_THRESHOLD", "50"))
 
 # ── File Paths ──────────────────────────────────────────────────────
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-LYRICS_DB_PATH = os.path.join(BASE_DIR, "lyrics_db.json")DATASET_FOLDER = os.path.join(os.path.dirname(BASE_DIR), "data")UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
+LYRICS_DB_PATH = os.path.join(BASE_DIR, "lyrics_db.json")
+DATASET_FOLDER = os.path.join(os.path.dirname(BASE_DIR), "data")
+UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
 
 # Create uploads folder if it doesn't exist
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
